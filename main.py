@@ -15,7 +15,7 @@ kurs = pd.read_csv("Data_Historis_USD_IDR_2019.csv")
 minyak = pd.read_csv("Data_Historis_Minyak_2019.csv")
 forecast = pd.read_csv("hasil_forecast_arimax_fix.csv")
 
-# bersihin nama kolom (biar aman dari error spasi)
+# bersihin nama kolom 
 kurs.columns = kurs.columns.str.strip()
 minyak.columns = minyak.columns.str.strip()
 forecast.columns = forecast.columns.str.strip()
@@ -82,13 +82,20 @@ elif selected == "Nilai Tukar Rupiah":
         x=kurs.index,
         y=kurs['Terakhir'],
         mode='lines',
-        name='Nilai Tukar'
+        name='Nilai Tukar',
+        line=dict(width=2)
     ))
+
+    # hitung range otomatis (biar nggak flat)
+    y_min = kurs['Terakhir'].min()
+    y_max = kurs['Terakhir'].max()
+    padding = (y_max - y_min) * 0.2  # 20% biar lebih lega
 
     fig.update_layout(
         title="Pergerakan Nilai Tukar Rupiah",
         template="plotly_white",
-        yaxis=dict(range=[kurs['Terakhir'].min()-100, kurs['Terakhir'].max()+100])
+        yaxis=dict(range=[y_min - padding, y_max + padding]),
+        hovermode="x unified"
     )
 
     st.plotly_chart(fig, use_container_width=True)
