@@ -11,18 +11,28 @@ st.set_page_config(page_title="Dashboard Forecast Nilai Tukar", layout="wide")
 # ======================
 # LOAD & PREPROCESSING DATA 
 # ======================
-kurs = pd.read_csv("Data_Historis_Minyak_2019.csv")
-minyak = pd.read_csv("Data_Historis_USD_IDR_2019.csv")
+kurs = pd.read_csv("Data_Historis_USD_IDR_2019.csv")
+minyak = pd.read_csv("Data_Historis_Minyak_2019.csv")
 forecast = pd.read_csv("hasil_forecast_arimax_fix.csv")
 
+# bersihin nama kolom (biar aman dari error spasi)
+kurs.columns = kurs.columns.str.strip()
+minyak.columns = minyak.columns.str.strip()
+forecast.columns = forecast.columns.str.strip()
+
+# convert tanggal
 kurs['Tanggal'] = pd.to_datetime(kurs['Tanggal'])
 minyak['Date'] = pd.to_datetime(minyak['Date'])
 forecast['Tanggal'] = pd.to_datetime(forecast['Tanggal'])
 
+# rename kolom
 minyak = minyak.rename(columns={'Date': 'Tanggal', 'Price': 'Harga'})
+
+# ubah ke numerik
 kurs['Terakhir'] = kurs['Terakhir'].astype(str).str.replace(',', '').astype(float)
 minyak['Harga'] = minyak['Harga'].astype(str).str.replace(',', '').astype(float)
 
+# sorting + index
 kurs = kurs.sort_values("Tanggal").set_index("Tanggal")
 minyak = minyak.sort_values("Tanggal").set_index("Tanggal")
 forecast = forecast.sort_values("Tanggal").set_index("Tanggal")
@@ -35,45 +45,85 @@ with st.sidebar:
         menu_title="Main Menu",
         options=["Home", "Nilai Tukar Rupiah", "Harga Minyak Mentah", "Forecast", "Evaluasi"],
         icons=["house", "currency-exchange", "fuel-pump", "graph-up-arrow", "clipboard-data"],
-        menu_icon="cast",
         default_index=0,
     )
 
 # ======================
-# LOGIC NAVIGATION
+# HOME
 # ======================
 if selected == "Home":
     st.write("##")
     st.markdown("""
-        <h1 style='text-align: center; font-size: 50px;'>Peramalan Nilai Tukar IDR-USD,<br>Oktober - Desember 2025.</h1>
-        <p style='text-align: center; font-size: 20px; color: #666;'>
-            Menyediakan layanan peramalan nilai tukar USD ke Rupiah <br> 
-            menggunakan model ARIMAX berdasarkan data historis.
+        <h1 style='text-align: center; font-size: 50px;'>
+        Peramalan Nilai Tukar IDR-USD,<br>Oktober - Desember 2025
+        </h1>
+        <p style='text-align: center; font-size: 18px; color: #666;'>
+        Dashboard ini digunakan untuk melakukan peramalan nilai tukar Rupiah terhadap USD 
+        menggunakan model ARIMAX dengan variabel eksternal harga minyak mentah dunia.
         </p>
     """, unsafe_allow_html=True)
-    st.markdown("---")
-    st.subheader("Tentang Proyek Ini")
-    st.write("Dashboard ini digunakan untuk membantu pengambilan keputusan strategis terkait manajemen risiko nilai tukar dengan memanfaatkan variabel harga minyak dunia sebagai prediktor.")
 
+    st.markdown("---")
+    st.subheader("Tentang Proyek")
+    st.write("""
+    Dashboard ini membantu analisis pergerakan nilai tukar serta memberikan hasil peramalan 
+    yang dapat digunakan sebagai dasar pengambilan keputusan, khususnya dalam menghadapi 
+    risiko fluktuasi nilai tukar.
+    """)
+
+# ======================
+# NILAI TUKAR
+# ======================
 elif selected == "Nilai Tukar Rupiah":
     st.subheader("Grafik Nilai Tukar Rupiah")
-    fig = go.Figure(go.Scatter(x=kurs.index, y=kurs['Terakhir'], mode='lines', name='Nilai Tukar'))
-    fig.update_layout(title="Pergerakan Nilai Tukar Rupiah", template="plotly_white")
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=kurs.index,
+        y=kurs['Terakhir'],
+        mode='lines',
+        name='Nilai Tukar'
+    ))
+
+    fig.update_layout(
+        title="Pergerakan Nilai Tukar Rupiah",
+        template="plotly_white",
+        yaxis=dict(range=[kurs['Terakhir'].min()-100, kurs['Terakhir'].max()+100])
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
+# ======================
+# MINYAK
+# ======================
 elif selected == "Harga Minyak Mentah":
     st.subheader("Grafik Harga Minyak Mentah")
-    fig = go.Figure(go.Scatter(x=minyak.index, y=minyak['Harga'], mode='lines', name='Harga Minyak', line=dict(color='orange')))
-    fig.update_layout(title="Pergerakan Harga Minyak Mentah Dunia", template="plotly_white")
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=minyak.index,
+        y=minyak['Harga'],
+        mode='lines',
+        name='Harga Minyak',
+        line=dict(color='orange')
+    ))
+
+    fig.update_layout(
+        title="Pergerakan Harga Minyak Mentah Dunia",
+        template="plotly_white"
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
+# ======================
+# FORECAST
+# ======================
 elif selected == "Forecast":
     st.subheader("Visualisasi Forecast Harian per Minggu")
-    
-    # Logic Label Mingguan
+
     df_weekly = forecast.copy()
     df_weekly['Month'] = df_weekly.index.strftime('%B')
-    
+
     def get_week_of_month(date):
         first_day = date.replace(day=1)
         dom = date.day
@@ -82,53 +132,76 @@ elif selected == "Forecast":
 
     df_weekly['Week_Num'] = [get_week_of_month(d) for d in df_weekly.index]
     df_weekly['Label'] = df_weekly['Month'] + " Minggu ke-" + df_weekly['Week_Num'].astype(str)
-    
+
     selected_week = st.selectbox("Pilih Periode Mingguan:", df_weekly['Label'].unique())
     filtered_df = df_weekly[df_weekly['Label'] == selected_week]
-    
-    fig1 = go.Figure(go.Scatter(
-        x=filtered_df.index.strftime('%d %b'), 
-        y=filtered_df['Forecast_ARIMAX'], 
-        mode='lines+markers', 
-        name='Forecast',
-        line=dict(width=3, color='#636EFA')
+
+    # Grafik forecast harian
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(
+        x=filtered_df.index.strftime('%d %b'),
+        y=filtered_df['Forecast_ARIMAX'],
+        mode='lines+markers',
+        name='Forecast'
     ))
-    fig1.update_layout(title=f"Tren Forecast Harian: {selected_week}", template="plotly_white")
+
+    fig1.update_layout(
+        title=f"Tren Forecast: {selected_week}",
+        template="plotly_white"
+    )
+
     st.plotly_chart(fig1, use_container_width=True)
 
     st.markdown("---")
-    
+
+    # Perbandingan actual vs forecast
     st.subheader("Perbandingan Actual vs Forecast")
+
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=forecast.index, y=forecast['Actual'], name='Actual', line=dict(color='#636EFA')))
-    fig2.add_trace(go.Scatter(x=forecast.index, y=forecast['Forecast_ARIMAX'], name='Forecast', line=dict(dash='dash', color="#FF2D2D")))
-    fig2.update_layout(template="plotly_white", hovermode="x unified")
+    fig2.add_trace(go.Scatter(
+        x=forecast.index,
+        y=forecast['Actual'],
+        name='Actual'
+    ))
+    fig2.add_trace(go.Scatter(
+        x=forecast.index,
+        y=forecast['Forecast_ARIMAX'],
+        name='Forecast',
+        line=dict(dash='dash')
+    ))
+
+    fig2.update_layout(template="plotly_white")
+
     st.plotly_chart(fig2, use_container_width=True)
-    
-    # 2 Tabel Sebelahan
-    st.subheader("Detail Data: Actual vs Forecast")
+
+    # tabel
     col1, col2 = st.columns(2)
+
     with col1:
-        st.write("**Tabel Nilai Aktual**")
+        st.subheader("Data Aktual")
         st.dataframe(forecast[['Actual']], use_container_width=True)
+
     with col2:
-        st.write("**Tabel Hasil Peramalan**")
+        st.subheader("Data Forecast")
         st.dataframe(forecast[['Forecast_ARIMAX']], use_container_width=True)
 
+# ======================
+# EVALUASI
+# ======================
 elif selected == "Evaluasi":
-    st.subheader("Evaluasi Performa Model")
+    st.subheader("Evaluasi Model")
+
     rmse = ((forecast['Actual'] - forecast['Forecast_ARIMAX'])**2).mean()**0.5
     mape = (abs((forecast['Actual'] - forecast['Forecast_ARIMAX']) / forecast['Actual']).mean()) * 100
-    
+
     col1, col2 = st.columns(2)
-    col1.metric("RMSE (Root Mean Square Error)", f"Rp {rmse:,.2f}")
-    col2.metric("MAPE (Mean Absolute Percentage Error)", f"{mape:.2f}%")
+    col1.metric("RMSE", f"{rmse:.2f}")
+    col2.metric("MAPE", f"{mape:.2f}%")
 
     st.markdown("---")
+
     st.write("""
-    ### Insight untuk Pengambilan Keputusan Bisnis:
-    * **RMSE (Rp {rmse:,.2f}):** Nilai ini mencerminkan deviasi rata-rata peramalan dalam Rupiah. Semakin rendah nilai ini, semakin stabil model dalam memprediksi nilai tukar yang sebenarnya, sehingga membantu perusahaan dalam mengestimasi anggaran kebutuhan valas dengan lebih presisi.
-    * **MAPE ({mape:.2f}%):** Menunjukkan tingkat kesalahan relatif model. Dengan tingkat akurasi ini, manajemen dapat memetakan risiko fluktuasi nilai tukar dalam rencana keuangan jangka pendek dengan tingkat kepercayaan yang terukur.
-    
-    **Kesimpulan:** Semakin rendah kedua nilai ini, semakin tinggi keandalan model sebagai basis data dalam menyusun strategi lindung nilai (*hedging*) atau perencanaan arus kas perusahaan.
-    """.format(rmse=rmse, mape=mape))
+    RMSE menunjukkan rata-rata error dalam satuan rupiah, sedangkan MAPE menunjukkan 
+    error dalam bentuk persentase. Semakin kecil nilainya, maka model semakin baik 
+    dalam melakukan peramalan.
+    """)
