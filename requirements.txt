@@ -1,0 +1,14 @@
+<<<<<<< HEAD
+# requirements.txt
+snowflake-connector-python
+streamlit
+streamlit-option-menu
+plotly
+=======
+# requirements.txt
+snowflake-connector-python
+streamlit
+streamlit-option-menu
+plotly
+>>>>>>> eda766a (initial commit)
+pandas
