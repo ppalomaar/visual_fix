@@ -8,17 +8,15 @@ from streamlit_option_menu import option_menu
 # ======================
 st.set_page_config(page_title="Dashboard Forecast Nilai Tukar", layout="wide")
 
+# Fungsi filter mingguan untuk Forecast
 def get_week_label(df):
-    """Menambahkan kolom label mingguan ke dataframe"""
     df = df.copy()
     df['Month'] = df.index.strftime('%B')
-    
     def get_week_of_month(date):
         first_day = date.replace(day=1)
         dom = date.day
         adjusted_dom = dom + first_day.weekday()
         return int((adjusted_dom - 1) / 7) + 1
-
     df['Week_Num'] = [get_week_of_month(d) for d in df.index]
     df['Label'] = df['Month'] + " Minggu ke-" + df['Week_Num'].astype(str)
     return df
@@ -39,7 +37,6 @@ minyak['Date'] = pd.to_datetime(minyak['Date'])
 forecast['Tanggal'] = pd.to_datetime(forecast['Tanggal'])
 
 minyak = minyak.rename(columns={'Date': 'Tanggal', 'Price': 'Harga'})
-
 kurs['Terakhir'] = kurs['Terakhir'].astype(str).str.replace(',', '').astype(float)
 minyak['Harga'] = minyak['Harga'].astype(str).str.replace(',', '').astype(float)
 
@@ -47,9 +44,12 @@ kurs = kurs.sort_values("Tanggal").set_index("Tanggal")
 minyak = minyak.sort_values("Tanggal").set_index("Tanggal")
 forecast = forecast.sort_values("Tanggal").set_index("Tanggal")
 
-# Tambahkan label untuk filter mingguan
-kurs = get_week_label(kurs)
-minyak = get_week_label(minyak)
+# Tambahkan kolom tahun untuk filter Kurs dan Minyak
+kurs['Year'] = kurs.index.year
+minyak['Year'] = minyak.index.year
+
+# Tambahkan label untuk filter mingguan Forecast
+forecast = get_week_label(forecast)
 
 # ======================
 # SIDEBAR
@@ -80,36 +80,26 @@ if selected == "Home":
 
 elif selected == "Nilai Tukar Rupiah":
     st.subheader("Grafik Nilai Tukar Rupiah")
-    selected_week = st.selectbox("Pilih Periode Mingguan:", kurs['Label'].unique())
-    filtered_kurs = kurs[kurs['Label'] == selected_week]
+    selected_year = st.selectbox("Pilih Tahun:", sorted(kurs['Year'].unique()))
+    filtered_kurs = kurs[kurs['Year'] == selected_year]
     
-    fig = go.Figure(go.Scatter(x=filtered_kurs.index, y=filtered_kurs['Terakhir'], mode='lines+markers', name='Nilai Tukar'))
-    fig.update_layout(title=f"Pergerakan Nilai Tukar: {selected_week}", template="plotly_white")
+    fig = go.Figure(go.Scatter(x=filtered_kurs.index, y=filtered_kurs['Terakhir'], mode='lines', name='Nilai Tukar'))
+    fig.update_layout(title=f"Pergerakan Nilai Tukar Tahun {selected_year}", template="plotly_white")
     st.plotly_chart(fig, use_container_width=True)
 
 elif selected == "Harga Minyak Mentah":
     st.subheader("Grafik Harga Minyak Mentah")
-    selected_week = st.selectbox("Pilih Periode Mingguan:", minyak['Label'].unique())
-    filtered_minyak = minyak[minyak['Label'] == selected_week]
+    selected_year = st.selectbox("Pilih Tahun:", sorted(minyak['Year'].unique()))
+    filtered_minyak = minyak[minyak['Year'] == selected_year]
     
-    fig = go.Figure(go.Scatter(x=filtered_minyak.index, y=filtered_minyak['Harga'], mode='lines+markers', name='Harga Minyak', line=dict(color='orange')))
-    fig.update_layout(title=f"Pergerakan Harga Minyak: {selected_week}", template="plotly_white")
+    fig = go.Figure(go.Scatter(x=filtered_minyak.index, y=filtered_minyak['Harga'], mode='lines', name='Harga Minyak', line=dict(color='orange')))
+    fig.update_layout(title=f"Harga Minyak Mentah Tahun {selected_year}", template="plotly_white")
     st.plotly_chart(fig, use_container_width=True)
 
 elif selected == "Forecast":
     st.subheader("Visualisasi Forecast Harian per Minggu")
-    df_weekly = forecast.copy()
-    df_weekly['Month'] = df_weekly.index.strftime('%B')
-    def get_week_of_month(date):
-        first_day = date.replace(day=1)
-        dom = date.day
-        adjusted_dom = dom + first_day.weekday()
-        return int((adjusted_dom - 1) / 7) + 1
-    df_weekly['Week_Num'] = [get_week_of_month(d) for d in df_weekly.index]
-    df_weekly['Label'] = df_weekly['Month'] + " Minggu ke-" + df_weekly['Week_Num'].astype(str)
-    
-    selected_week = st.selectbox("Pilih Periode Mingguan:", df_weekly['Label'].unique())
-    filtered_df = df_weekly[df_weekly['Label'] == selected_week]
+    selected_week = st.selectbox("Pilih Periode Mingguan:", forecast['Label'].unique())
+    filtered_df = forecast[forecast['Label'] == selected_week]
     
     fig1 = go.Figure(go.Scatter(x=filtered_df.index.strftime('%d %b'), y=filtered_df['Forecast_ARIMAX'], mode='lines+markers', name='Forecast'))
     fig1.update_layout(title=f"Tren Forecast: {selected_week}", template="plotly_white")
